@@ -20,6 +20,7 @@ PLAYER_SIZE_FACTOR = 0.5
 ENEMY_SIZE_FACTOR = 0.5
 
 MISSILE_SPEED = 10
+SWARM_SPEED = 5
 
 ENEMY_SHOOT_COOLDOWN = 25
 
@@ -44,6 +45,26 @@ class Player(arcade.Sprite):
         missile.center_y = self.top
         missile.center_x = self.center_x
         missile_list.append(missile)
+
+
+class EnemySwarm(arcade.SpriteList):
+    def __init__(self, *args, **kwargs):
+        self.speed_x = SWARM_SPEED
+        super().__init__(*args, **kwargs)
+
+    def update(self):
+        leftmost = min([e.left for e in self.sprite_list])
+        rightmost = max([e.right for e in self.sprite_list])
+
+        if leftmost < SCREEN_WIDTH * 0.1:
+            self.speed_x = SWARM_SPEED
+        elif rightmost > SCREEN_WIDTH * 0.9:
+            self.speed_x = -SWARM_SPEED
+
+        for sprite in self.sprite_list:
+            sprite.center_x += self.speed_x
+
+        super().update()
 
 
 class EnemyShip(arcade.Sprite):
@@ -114,7 +135,7 @@ class MyGame(arcade.Window):
 
         self.player_list.append(self.player_sprite)
 
-        self.enemy_list = arcade.SpriteList()
+        self.enemy_list = EnemySwarm()
         self.create_enemy_grid(3, 6)
 
         self.up_missile_list = arcade.SpriteList()
@@ -167,6 +188,8 @@ class MyGame(arcade.Window):
         self.player_list.update()
         self.up_missile_list.update()
         self.down_missile_list.update()
+        self.enemy_list.update()
+
 
         rows_per_column = {}
         for enemy in self.enemy_list:
