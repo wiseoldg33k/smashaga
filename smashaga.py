@@ -23,12 +23,19 @@ MISSILE_SPEED = 10
 SWARM_SPEED = 5
 
 ENEMY_SHOOT_COOLDOWN = 25
+MAX_PLAYER_BULLETS = 3
 
 ENEMIES = (
     ('enemy_1.png', 100),
     ('enemy_2.png', 200),
     ('enemy_3.png', 300)
 )
+
+ENEMIES_ROWS = 3
+ENEMIES_COLUMNS = 6
+MAX_ENEMIES = ENEMIES_ROWS * ENEMIES_COLUMNS
+
+MAX_BALL_SPEED = 8
 
 class Player(arcade.Sprite):
 
@@ -46,6 +53,23 @@ class Player(arcade.Sprite):
         missile.center_x = self.center_x
         missile_list.append(missile)
 
+class SmashBall(arcade.Sprite):
+
+    def update(self):
+        self.center_x += self.change_x
+        self.center_y += self.change_y
+
+        if self.center_x > SCREEN_WIDTH:
+            self.change_x *= -1
+
+        if self.center_y > SCREEN_HEIGHT:
+            self.change_y *= -1
+
+        if self.center_x < 0:
+            self.change_x *= -1
+
+        if self.center_y < 0:
+            self.change_y *= -1
 
 class EnemySwarm(arcade.SpriteList):
     def __init__(self, *args, **kwargs):
@@ -141,6 +165,15 @@ class MyGame(arcade.Window):
         self.up_missile_list = arcade.SpriteList()
         self.down_missile_list = arcade.SpriteList()
 
+        self.ball_list = arcade.SpriteList()
+
+    def spawn_ball(self):
+        ball = SmashBall('lollipop_green.png')
+        ball.center_x = SCREEN_WIDTH //2 #random.randrange(SCREEN_WIDTH * .1, SCREEN_WIDTH * .9)
+        ball.center_y = SCREEN_HEIGHT //2 #random.randrange(SCREEN_HEIGHT * .1, SCREEN_HEIGHT * .9)
+        ball.change_x = random.randrange(MAX_BALL_SPEED // 2, MAX_BALL_SPEED)
+        ball.change_y = random.randrange(MAX_BALL_SPEED // 2, MAX_BALL_SPEED)
+        self.ball_list.append(ball)
 
     def spawn_enemy(self, row, column, texture, points):
         enemy = EnemyShip(filename=texture, scale=ENEMY_SIZE_FACTOR, row=row, column=column)
@@ -167,8 +200,11 @@ class MyGame(arcade.Window):
             self.player_list.draw()
             self.enemy_list.draw()
 
+            self.ball_list.draw()
+
             self.up_missile_list.draw()
             self.down_missile_list.draw()
+            
 
         if self.state == STATE_WIN:
             arcade.draw_text('YOU WIN', SCREEN_WIDTH//3, SCREEN_HEIGHT //2, arcade.color.YELLOW, 74, bold=True)
@@ -189,7 +225,7 @@ class MyGame(arcade.Window):
         self.up_missile_list.update()
         self.down_missile_list.update()
         self.enemy_list.update()
-
+        self.ball_list.update()
 
         rows_per_column = {}
         for enemy in self.enemy_list:
@@ -217,6 +253,12 @@ class MyGame(arcade.Window):
             if missile.center_y < 0:
                 missile.kill()
 
+
+        if True: #len(self.enemy_list) <= MAX_ENEMIES // 2:
+            if not len(self.ball_list): 
+                self.spawn_ball()
+
+
         if not len(self.enemy_list):
             self.state = STATE_WIN
 
@@ -234,7 +276,8 @@ class MyGame(arcade.Window):
         elif key == arcade.key.RIGHT:
             self.player_sprite.change_x = MOVEMENT_SPEED
         if key in (arcade.key.UP, arcade.key.SPACE):
-            self.player_sprite.shoot(self.up_missile_list)
+            if len(self.up_missile_list) <= MAX_PLAYER_BULLETS:
+                self.player_sprite.shoot(self.up_missile_list)
 
         if self.state in (STATE_DEFEAT, STATE_WIN):
             if key in (arcade.key.ESCAPE, arcade.key.R):
