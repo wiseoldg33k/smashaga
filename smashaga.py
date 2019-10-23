@@ -189,6 +189,8 @@ class MyGame(arcade.Window):
             texture_name = f"explosion/explosion{i:04d}.png"
             self.explosion_texture_list.append(arcade.load_texture(texture_name))
 
+        self.background = arcade.load_texture("background.jpg")
+
     def setup(self):
         self.ball_sprite = None
         self.score = 0
@@ -269,6 +271,9 @@ class MyGame(arcade.Window):
     def on_draw(self):
         """ Draw everything """
         arcade.start_render()
+
+        arcade.draw_texture_rectangle(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2,
+                                      SCREEN_WIDTH, SCREEN_HEIGHT, self.background)
         
         if self.state == STATE_PLAYING:
             self.player_list.draw()
@@ -277,7 +282,7 @@ class MyGame(arcade.Window):
                 self.ball_sprite.draw()
             self.up_missile_list.draw()
             self.down_missile_list.draw()
-            self.explosions_list.draw()
+        self.explosions_list.draw()
 
         if self.state == STATE_WIN:
             arcade.draw_text('YOU WIN', SCREEN_WIDTH//3, SCREEN_HEIGHT //2, arcade.color.YELLOW, 74, bold=True)
@@ -291,6 +296,9 @@ class MyGame(arcade.Window):
 
     def update(self, delta_time):
         """ Movement and game logic """
+
+        self.explosions_list.update()
+
         if not self.state == STATE_PLAYING:
             return
 
@@ -302,7 +310,6 @@ class MyGame(arcade.Window):
         self.enemy_list.update()
         if self.ball_sprite:
             self.ball_sprite.update(delta_time)
-        self.explosions_list.update()
 
         rows_per_column = {}
         for enemy in self.enemy_list:
