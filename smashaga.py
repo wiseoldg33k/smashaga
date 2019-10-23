@@ -40,6 +40,9 @@ MAX_BALL_SPEED = 12
 MAX_BALL_HEALTH = 3
 BALL_COOLDOWN = 35
 BALL_SIZE_FACTOR = 1.5
+BALL_APPEAR_TIME = 5
+
+BONUS_MISSILES_NUMBER = 10
 
 class Player(arcade.Sprite):
 
@@ -167,6 +170,8 @@ class MyGame(arcade.Window):
         self.ball_sprite = None
         self.score = 0
         self.state = STATE_PLAYING
+        self.game_time = 0.0
+        self.ball_appear_time = random.randint(BALL_APPEAR_TIME, 4 * BALL_APPEAR_TIME)
 
         self.ball_has_spawn = False
 
@@ -230,9 +235,9 @@ class MyGame(arcade.Window):
             missile_list = self.down_missile_list
             center_y = SCREEN_HEIGHT
 
-        for i in range(5):
+        for _ in range(BONUS_MISSILES_NUMBER):
             missile = missile_cls(missile_sprite)
-            missile.center_y = center_y
+            missile.center_y = center_y + random.randint(SCREEN_HEIGHT * -.1, SCREEN_HEIGHT * .1)
             missile.center_x = random.randint(0, SCREEN_WIDTH)
             missile_list.append(missile)
 
@@ -262,6 +267,8 @@ class MyGame(arcade.Window):
         """ Movement and game logic """
         if not self.state == STATE_PLAYING:
             return
+
+        self.game_time += delta_time
 
         self.player_list.update()
         self.up_missile_list.update()
@@ -313,7 +320,7 @@ class MyGame(arcade.Window):
             self.ball_sprite.kill()
             self.ball_sprite = None
             
-        if not self.ball_has_spawn: 
+        if not self.ball_has_spawn and self.game_time > self.ball_appear_time: 
             self.spawn_ball()
 
         if not len(self.enemy_list):
