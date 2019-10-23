@@ -44,6 +44,24 @@ BALL_APPEAR_TIME = 5
 
 BONUS_MISSILES_NUMBER = 10
 
+EXPLOSION_TEXTURE_COUNT = 30
+
+class Explosion(arcade.Sprite):
+    """ This class creates an explosion animation """
+    explosion_textures = []
+
+    def __init__(self, texture_list):
+        super().__init__("explosion/explosion0000.png")
+        self.current_texture = 0
+        self.textures = texture_list
+
+    def update(self):
+        self.current_texture += 1
+        if self.current_texture < len(self.textures):
+            self.set_texture(self.current_texture)
+        else:
+            self.kill()
+
 class Player(arcade.Sprite):
 
     def update(self):
@@ -166,6 +184,11 @@ class MyGame(arcade.Window):
         self.set_mouse_visible(False)
         arcade.set_background_color(arcade.color.BLACK)
 
+        self.explosion_texture_list = []
+        for i in range(EXPLOSION_TEXTURE_COUNT):
+            texture_name = f"explosion/explosion{i:04d}.png"
+            self.explosion_texture_list.append(arcade.load_texture(texture_name))
+
     def setup(self):
         self.ball_sprite = None
         self.score = 0
@@ -187,6 +210,8 @@ class MyGame(arcade.Window):
 
         self.up_missile_list = arcade.SpriteList()
         self.down_missile_list = arcade.SpriteList()
+
+        self.explosions_list = arcade.SpriteList()
 
     def spawn_ball(self):
         ball = SmashBall('lollipop_green.png', BALL_SIZE_FACTOR)
@@ -252,6 +277,7 @@ class MyGame(arcade.Window):
                 self.ball_sprite.draw()
             self.up_missile_list.draw()
             self.down_missile_list.draw()
+            self.explosions_list.draw()
 
         if self.state == STATE_WIN:
             arcade.draw_text('YOU WIN', SCREEN_WIDTH//3, SCREEN_HEIGHT //2, arcade.color.YELLOW, 74, bold=True)
@@ -276,6 +302,7 @@ class MyGame(arcade.Window):
         self.enemy_list.update()
         if self.ball_sprite:
             self.ball_sprite.update(delta_time)
+        self.explosions_list.update()
 
         rows_per_column = {}
         for enemy in self.enemy_list:
@@ -294,6 +321,10 @@ class MyGame(arcade.Window):
             for enemy in collides:
                 enemy.kill()
                 missile.kill()
+                explosion = Explosion(self.explosion_texture_list)
+                explosion.center_x = enemy.center_x
+                explosion.center_y = enemy.center_y
+                self.explosions_list.append(explosion)
                 self.score += enemy.bonus_points
 
             if missile.center_y > SCREEN_HEIGHT:
@@ -331,6 +362,9 @@ class MyGame(arcade.Window):
             self.player_sprite.kill()
             for missile in deadly_missiles:
                 missile.kill()
+                explosion = Explosion(self.explosion_texture_list)
+                explosion.center_x = self.player_sprite.center_x
+                explosion.center_y = self.player_sprite.center_y
             self.state = STATE_DEFEAT
 
     def on_key_press(self, key, modifiers):
