@@ -1,4 +1,5 @@
 import arcade
+from arcade.draw_commands import load_texture
 import os
 import math
 import random
@@ -12,7 +13,7 @@ SCREEN_WIDTH = 800 * 3
 SCREEN_HEIGHT = 600 * 3
 SCREEN_TITLE = "Smashaga"
 SCREEN_CENTER_X = SCREEN_WIDTH // 2
-SCREEN_CENTER_Y = SCREEN_HEIGHT // 2
+SCREEN_CENTER_Y = SCREEN_HEIGHT * .7
 
 MOVEMENT_SPEED = 10
 
@@ -35,7 +36,10 @@ ENEMIES_ROWS = 3
 ENEMIES_COLUMNS = 6
 MAX_ENEMIES = ENEMIES_ROWS * ENEMIES_COLUMNS
 
-MAX_BALL_SPEED = 8
+MAX_BALL_SPEED = 12
+MAX_BALL_HEALTH = 3
+BALL_COOLDOWN = 35
+BALL_SIZE_FACTOR = 1.5
 
 class Player(arcade.Sprite):
 
@@ -55,7 +59,12 @@ class Player(arcade.Sprite):
 
 class SmashBall(arcade.Sprite):
 
-    def update(self):
+    def __init__(self, *args, **kwargs):
+        self.health = MAX_BALL_HEALTH
+        self.cooldown = 0
+        super().__init__(*args, **kwargs)
+
+    def update(self, delta_time):
         self.center_x += self.change_x
         self.center_y += self.change_y
 
@@ -70,6 +79,13 @@ class SmashBall(arcade.Sprite):
 
         if self.center_y < 0:
             self.change_y *= -1
+
+        self.cooldown -= delta_time * 10
+
+        if self.cooldown > 0 and not self.cur_texture_index:
+            self.set_texture(1)
+        else:
+            self.set_texture(0)
 
 class EnemySwarm(arcade.SpriteList):
     def __init__(self, *args, **kwargs):
@@ -148,9 +164,11 @@ class MyGame(arcade.Window):
         arcade.set_background_color(arcade.color.BLACK)
 
     def setup(self):
-
+        self.ball_sprite = None
         self.score = 0
         self.state = STATE_PLAYING
+
+        self.ball_has_spawn = False
 
         self.player_list = arcade.SpriteList()
         self.player_sprite = Player('player.png', scale=PLAYER_SIZE_FACTOR)
@@ -165,15 +183,19 @@ class MyGame(arcade.Window):
         self.up_missile_list = arcade.SpriteList()
         self.down_missile_list = arcade.SpriteList()
 
-        self.ball_list = arcade.SpriteList()
-
     def spawn_ball(self):
-        ball = SmashBall('lollipop_green.png')
-        ball.center_x = SCREEN_WIDTH //2 #random.randrange(SCREEN_WIDTH * .1, SCREEN_WIDTH * .9)
-        ball.center_y = SCREEN_HEIGHT //2 #random.randrange(SCREEN_HEIGHT * .1, SCREEN_HEIGHT * .9)
+        ball = SmashBall('lollipop_green.png', BALL_SIZE_FACTOR)
+        texture = load_texture('lollipop_red.png')
+        width = texture.width * BALL_SIZE_FACTOR
+        height = texture.height * BALL_SIZE_FACTOR
+        texture.scale = BALL_SIZE_FACTOR
+        ball.append_texture(texture)
+        ball.center_x = random.randrange(SCREEN_WIDTH * .1, SCREEN_WIDTH * .9)
+        ball.center_y = random.randrange(SCREEN_HEIGHT * .1, SCREEN_HEIGHT * .9)
         ball.change_x = random.randrange(MAX_BALL_SPEED // 2, MAX_BALL_SPEED)
         ball.change_y = random.randrange(MAX_BALL_SPEED // 2, MAX_BALL_SPEED)
-        self.ball_list.append(ball)
+        self.ball_sprite = ball
+        self.ball_has_spawn = True
 
     def spawn_enemy(self, row, column, texture, points):
         enemy = EnemyShip(filename=texture, scale=ENEMY_SIZE_FACTOR, row=row, column=column)
@@ -192,6 +214,28 @@ class MyGame(arcade.Window):
             for column in range(-middle, middle + 1):
                 enemy_row.append(self.spawn_enemy(row, column, texture, points))
 
+
+    def spawn_bonus(self, who):
+        self.ball_sprite.health -= 1
+        self.ball_sprite.cooldown = BALL_COOLDOWN
+
+        if who == 'player':
+            missile_sprite = 'bonus_missile_blue.png'
+            missile_cls = UpMissile
+            missile_list = self.up_missile_list
+            center_y = 0
+        else:
+            missile_sprite = 'bonus_missile_red.png'
+            missile_cls = DownMissile
+            missile_list = self.down_missile_list
+            center_y = SCREEN_HEIGHT
+
+        for i in range(5):
+            missile = missile_cls(missile_sprite)
+            missile.center_y = center_y
+            missile.center_x = random.randint(0, SCREEN_WIDTH)
+            missile_list.append(missile)
+
     def on_draw(self):
         """ Draw everything """
         arcade.start_render()
@@ -199,12 +243,10 @@ class MyGame(arcade.Window):
         if self.state == STATE_PLAYING:
             self.player_list.draw()
             self.enemy_list.draw()
-
-            self.ball_list.draw()
-
+            if self.ball_sprite:
+                self.ball_sprite.draw()
             self.up_missile_list.draw()
             self.down_missile_list.draw()
-            
 
         if self.state == STATE_WIN:
             arcade.draw_text('YOU WIN', SCREEN_WIDTH//3, SCREEN_HEIGHT //2, arcade.color.YELLOW, 74, bold=True)
@@ -225,7 +267,8 @@ class MyGame(arcade.Window):
         self.up_missile_list.update()
         self.down_missile_list.update()
         self.enemy_list.update()
-        self.ball_list.update()
+        if self.ball_sprite:
+            self.ball_sprite.update(delta_time)
 
         rows_per_column = {}
         for enemy in self.enemy_list:
@@ -253,11 +296,25 @@ class MyGame(arcade.Window):
             if missile.center_y < 0:
                 missile.kill()
 
+        if self.ball_sprite and self.ball_sprite.cooldown <= 0:
+            bonus_up = arcade.check_for_collision_with_list(self.ball_sprite, self.up_missile_list)
+            if bonus_up:
+                self.spawn_bonus('player')
+                for missile in bonus_up:
+                    missile.kill()
+            
+            bonus_down = arcade.check_for_collision_with_list(self.ball_sprite, self.down_missile_list)
+            if bonus_down:
+                self.spawn_bonus('swarm')
+                for missile in bonus_down:
+                    missile.kill()
 
-        if True: #len(self.enemy_list) <= MAX_ENEMIES // 2:
-            if not len(self.ball_list): 
-                self.spawn_ball()
-
+        if self.ball_sprite and self.ball_sprite.health <= 0:
+            self.ball_sprite.kill()
+            self.ball_sprite = None
+            
+        if not self.ball_has_spawn: 
+            self.spawn_ball()
 
         if not len(self.enemy_list):
             self.state = STATE_WIN
